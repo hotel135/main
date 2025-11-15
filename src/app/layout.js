@@ -8,7 +8,7 @@ import { AdsProvider } from "@/context/AdsContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 export const metadata = {
-  title: "MeetAnEscort - Premium Escort Dating & Companionship Platform",
+  title: "MeetAnEscort - Find independent escorts",
   description:
     "Meet verified independent escorts and companions in your area. Safe, discreet, and professional encounters with premium dating experiences.",
   keywords:
@@ -16,7 +16,7 @@ export const metadata = {
 
   // Open Graph Meta Tags
   openGraph: {
-    title: "MeetAnEscort - Premium Escort Dating Platform",
+    title: "MeetAnEscort - Find independent escorts",
     description:
       "Connect with verified independent escorts and companions in your area. Safe, discreet, and professional dating experiences.",
     url: "https://meetanescort.com",
@@ -26,7 +26,7 @@ export const metadata = {
         url: "https://ibb.co/zVx5NXRS",
         width: 1200,
         height: 630,
-        alt: "MeetAnEscort - Premium Escort Dating Platform",
+        alt: "MeetAnEscort - Find independent escorts",
       },
     ],
     locale: "en_US",
@@ -36,7 +36,7 @@ export const metadata = {
   // Twitter Card Meta Tags
   twitter: {
     card: "summary_large_image",
-    title: "MeetAnEscort - Premium Escort Dating",
+    title: "MeetAnEscort - Find independent escorts",
     description: "Verified independent escorts and companions in your area",
     images: ["https://ibb.co/zVx5NXRS"],
   },

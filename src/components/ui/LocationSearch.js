@@ -1,4 +1,4 @@
-// src/components/ui/LocationSearch.js - FIXED VERSION
+// src/components/ui/LocationSearch.js - WITH API
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -101,7 +101,7 @@ export default function LocationSearch({
       .replace(/\s+/g, " ");
   }, []);
 
-  // Enhanced search with better fallback and no external API issues
+  // Enhanced search with API integration
   const searchLocations = useCallback(async (query) => {
     if (!query || query.length < 2) {
       // Show common locations when query is short
@@ -115,10 +115,63 @@ export default function LocationSearch({
     setIsLoading(true);
 
     try {
-      // REMOVED: External API call that causes CSP issues
-      // Using only local search for better reliability
+      // Try RapidAPI GeoDB first if API key exists
+      const apiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
+      if (apiKey && query.length >= 2) {
+        try {
+          const response = await fetch(
+            `https://wft-geo-db.p.rapidapi.com/v1/geo/cities?namePrefix=${encodeURIComponent(
+              query
+            )}&limit=10&sort=-population`,
+            {
+              headers: {
+                "X-RapidAPI-Key": apiKey,
+                "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
+              },
+            }
+          );
 
-      // Enhanced local search with better matching
+          if (response.ok) {
+            const data = await response.json();
+            if (data.data && data.data.length > 0) {
+              const apiSuggestions = data.data.map((city) => {
+                let locationString = city.city;
+                if (city.region) locationString += `, ${city.region}`;
+                locationString += `, ${city.country}`;
+
+                return {
+                  value: locationString,
+                  label: locationString,
+                  isFromAPI: true,
+                };
+              });
+
+              // Combine with local results for better coverage
+              const localResults = commonLocations.current
+                .filter(
+                  (loc) =>
+                    loc.toLowerCase().includes(query.toLowerCase()) &&
+                    !apiSuggestions.some((api) => api.value === loc)
+                )
+                .slice(0, 5)
+                .map((loc) => ({ value: loc, label: loc, isFromAPI: false }));
+
+              const combinedResults = [
+                ...apiSuggestions,
+                ...localResults,
+              ].slice(0, 12);
+              setSuggestions(combinedResults);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (apiError) {
+          console.log("API call failed, using fallback:", apiError);
+          // Continue to fallback
+        }
+      }
+
+      // Fallback: Enhanced local search
       const queryLower = query.toLowerCase().trim();
       const filtered = commonLocations.current
         .filter((loc) => {
@@ -144,19 +197,23 @@ export default function LocationSearch({
               locWords.some((locWord) => locWord.includes(word))
           );
         })
-        .slice(0, 10); // Increased limit for better results
+        .slice(0, 10);
 
       // Simulate API delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
-      setSuggestions(filtered.map((loc) => ({ value: loc, label: loc })));
+      setSuggestions(
+        filtered.map((loc) => ({ value: loc, label: loc, isFromAPI: false }))
+      );
     } catch (error) {
       console.log("Search error, using fallback:", error);
-      // Fallback to simple search
+      // Final fallback to simple search
       const filtered = commonLocations.current
         .filter((loc) => loc.toLowerCase().includes(query.toLowerCase()))
         .slice(0, 8);
-      setSuggestions(filtered.map((loc) => ({ value: loc, label: loc })));
+      setSuggestions(
+        filtered.map((loc) => ({ value: loc, label: loc, isFromAPI: false }))
+      );
     } finally {
       setIsLoading(false);
     }
@@ -202,7 +259,7 @@ export default function LocationSearch({
         if (onSearch) {
           onSearch(value, cleanUrl);
         } else {
-          // router.push(`/discover/${cleanUrl}`);
+          router.push(`/discover/${cleanUrl}`);
         }
 
         setShowSuggestions(false);
@@ -231,7 +288,11 @@ export default function LocationSearch({
         .slice(0, 8);
 
       setSuggestions(
-        popularLocations.map((loc) => ({ value: loc, label: loc }))
+        popularLocations.map((loc) => ({
+          value: loc,
+          label: loc,
+          isFromAPI: false,
+        }))
       );
     }
   }, [value, suggestions.length]);
@@ -274,13 +335,24 @@ export default function LocationSearch({
             <div
               key={index}
               onClick={() => handleSuggestionClick(suggestion)}
-              className="px-4 py-3 cursor-pointer hover:bg-pink-500/20 transition duration-200 border-b border-pink-500/10 last:border-b-0"
+              className="px-4 py-3 cursor-pointer hover:bg-pink-500/20 transition duration-200 border-b border-pink-500/10 last:border-b-0 group"
             >
-              <div className="text-white font-medium">
-                {suggestion.label.split(",")[0]}
-              </div>
-              <div className="text-pink-300 text-sm">
-                {suggestion.label.split(",").slice(1).join(",").trim()}
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="text-white font-medium">
+                    {suggestion.label.split(",")[0]}
+                  </div>
+                  <div className="text-pink-300 text-sm">
+                    {suggestion.label.split(",").slice(1).join(",").trim()}
+                  </div>
+                </div>
+                {/* {suggestion.isFromAPI && (
+                  <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-xs bg-pink-500/20 text-pink-300 px-2 py-1 rounded-full">
+                      API
+                    </span>
+                  </div>
+                )} */}
               </div>
             </div>
           ))}
@@ -303,7 +375,8 @@ export default function LocationSearch({
       {!value && (
         <div className="absolute -bottom-2 left-0 right-0 transform translate-y-full mt-1">
           <p className="text-pink-300/70 text-xs text-center">
-            {/* Try: "New York", "London", "Lagos", etc. */}
+            Try: &quot;New York&quot;, &quot;London&quot;, &quot;Lagos&quot;,
+            etc.
           </p>
         </div>
       )}

@@ -86,17 +86,14 @@ export default function Home() {
           </div>
 
           <h1 className="text-5xl sm:text-7xl font-bold text-white mb-6 leading-tight">
-            Find Your
+           Discover Real, Verified
             <span className="block bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent animate-gradient">
-              Perfect Match
-            </span>
+Independent Escorts Near You            </span>
           </h1>
 
           <p className="text-xl text-pink-100 mb-8 max-w-2xl mx-auto leading-relaxed opacity-90">
-            Discover exclusive experience with verified professionals.
-            <span className="block text-pink-300 font-medium">
-              Discreet, secure, and unforgettable experiences await.
-            </span>
+Browse authentic escort profiles, read honest reviews, and book discreetly             <span className="block text-pink-300 font-medium">
+through a secure platform built for privacy, safety, and trusted connections. Find the perfect companion in your city today            </span>
           </p>
 
           {/* Big Search Bar */}
