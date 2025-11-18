@@ -104,7 +104,6 @@ export default function LocationSearch({
   // Enhanced search with API integration
   const searchLocations = useCallback(async (query) => {
     if (!query || query.length < 2) {
-      // Show common locations when query is short
       const filtered = commonLocations.current
         .filter((loc) => loc.toLowerCase().includes(query.toLowerCase()))
         .slice(0, 8);
@@ -115,99 +114,93 @@ export default function LocationSearch({
     setIsLoading(true);
 
     try {
-      // Try RapidAPI GeoDB first if API key exists
-      const apiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
-      if (apiKey && query.length >= 2) {
-        try {
-          const response = await fetch(
-            `https://wft-geo-db.p.rapidapi.com/v1/geo/cities?namePrefix=${encodeURIComponent(
-              query
-            )}&limit=10&sort=-population`,
-            {
-              headers: {
-                "X-RapidAPI-Key": apiKey,
-                "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
-              },
-            }
-          );
+      // Try OpenStreetMap Nominatim first (free, no API key)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query
+        )}&addressdetails=1&limit=8&countrycodes=us,gb,ca,ng,ke,gh,za,eg,ma,fr,de,it,es,nl,jp,in,cn,br,au`
+      );
 
-          if (response.ok) {
-            const data = await response.json();
-            if (data.data && data.data.length > 0) {
-              const apiSuggestions = data.data.map((city) => {
-                let locationString = city.city;
-                if (city.region) locationString += `, ${city.region}`;
-                locationString += `, ${city.country}`;
+      if (response.ok) {
+        const data = await response.json();
 
-                return {
-                  value: locationString,
-                  label: locationString,
-                  isFromAPI: true,
-                };
-              });
+        if (data && data.length > 0) {
+          const apiSuggestions = data
+            .map((place) => {
+              const address = place.address;
+              let locationString = "";
 
-              // Combine with local results for better coverage
-              const localResults = commonLocations.current
-                .filter(
-                  (loc) =>
-                    loc.toLowerCase().includes(query.toLowerCase()) &&
-                    !apiSuggestions.some((api) => api.value === loc)
+              // Build intelligent location string
+              if (address.city || address.town || address.village) {
+                locationString =
+                  address.city || address.town || address.village;
+              } else if (address.municipality) {
+                locationString = address.municipality;
+              } else if (address.county) {
+                locationString = address.county;
+              }
+
+              if (address.state && address.state !== locationString) {
+                locationString += locationString
+                  ? `, ${address.state}`
+                  : address.state;
+              }
+
+              if (address.country) {
+                locationString += locationString
+                  ? `, ${address.country}`
+                  : address.country;
+              }
+
+              return {
+                value:
+                  locationString ||
+                  place.display_name.split(",").slice(0, 2).join(","),
+                label:
+                  locationString ||
+                  place.display_name.split(",").slice(0, 2).join(","),
+                isFromAPI: true,
+              };
+            })
+            .filter((suggestion) => suggestion.value.length > 0);
+
+          // Combine with local results for better coverage
+          const localResults = commonLocations.current
+            .filter(
+              (loc) =>
+                loc.toLowerCase().includes(query.toLowerCase()) &&
+                !apiSuggestions.some((api) =>
+                  api.value
+                    .toLowerCase()
+                    .includes(loc.split(",")[0].toLowerCase())
                 )
-                .slice(0, 5)
-                .map((loc) => ({ value: loc, label: loc, isFromAPI: false }));
+            )
+            .slice(0, 4)
+            .map((loc) => ({ value: loc, label: loc, isFromAPI: false }));
 
-              const combinedResults = [
-                ...apiSuggestions,
-                ...localResults,
-              ].slice(0, 12);
-              setSuggestions(combinedResults);
-              setIsLoading(false);
-              return;
-            }
-          }
-        } catch (apiError) {
-          console.log("API call failed, using fallback:", apiError);
-          // Continue to fallback
+          const combinedResults = [...apiSuggestions, ...localResults].slice(
+            0,
+            10
+          );
+          setSuggestions(combinedResults);
+          setIsLoading(false);
+          return;
         }
       }
 
-      // Fallback: Enhanced local search
+      // Fallback to enhanced local search
       const queryLower = query.toLowerCase().trim();
       const filtered = commonLocations.current
-        .filter((loc) => {
-          const locLower = loc.toLowerCase();
-
-          // Exact match at start (highest priority)
-          if (locLower.startsWith(queryLower)) {
-            return true;
-          }
-
-          // Contains the query anywhere
-          if (locLower.includes(queryLower)) {
-            return true;
-          }
-
-          // Match individual words
-          const queryWords = queryLower.split(/\s+/);
-          const locWords = locLower.split(/\s+|,/);
-
-          return queryWords.some(
-            (word) =>
-              word.length > 2 &&
-              locWords.some((locWord) => locWord.includes(word))
-          );
-        })
+        .filter((loc) => loc.toLowerCase().includes(queryLower))
         .slice(0, 10);
 
-      // Simulate API delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
+      await new Promise((resolve) => setTimeout(resolve, 150));
       setSuggestions(
         filtered.map((loc) => ({ value: loc, label: loc, isFromAPI: false }))
       );
     } catch (error) {
-      console.log("Search error, using fallback:", error);
-      // Final fallback to simple search
+      console.log("Search failed, using local fallback:", error);
+      // Final fallback
       const filtered = commonLocations.current
         .filter((loc) => loc.toLowerCase().includes(query.toLowerCase()))
         .slice(0, 8);

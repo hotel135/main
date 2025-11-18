@@ -162,21 +162,107 @@ export default function DiscoverPage({ initialLocation = "" }) {
   };
 
   // Smart location filtering with fallbacks
+  // SIMPLE FIX: Better location matching
   const filterProfilesByLocation = useCallback((profiles, location) => {
     if (!location) return profiles;
 
-    const normalizedSearch = normalizeLocation(expandAbbreviations(location));
+    const search = location.toLowerCase().trim();
     const fallbacks = getFallbackLocations(location);
 
     const scoredProfiles = profiles
       .map((profile) => {
-        const score = extractLocationHierarchy(location, profile.location);
+        if (!profile.location) return { ...profile, matchScore: 0 };
+
+        const profileLoc = profile.location.toLowerCase().trim();
+
+        // EXACT MATCH
+        if (profileLoc === search) return { ...profile, matchScore: 100 };
+
+        // Country & state abbreviation matching
+        const abbrevMap = {
+          us: ["united states", "usa", "america", "united states of america"],
+          usa: ["united states", "us", "america", "united states of america"],
+          america: ["united states", "us", "usa"],
+          uk: ["united kingdom", "england", "britain", "great britain"],
+          uae: ["united arab emirates", "dubai", "abu dhabi"],
+          sa: ["south africa"],
+          ca: ["canada"],
+        };
+
+        let abbreviationMatched = false;
+
+        Object.keys(abbrevMap).forEach((abbr) => {
+          const fullForms = abbrevMap[abbr];
+
+          // If search contains abbreviation or full form
+          if (
+            search.includes(abbr) ||
+            fullForms.some((f) => search.includes(f))
+          ) {
+            // Check if profile location matches any equivalent form
+            if (
+              profileLoc.includes(abbr) ||
+              fullForms.some((f) => profileLoc.includes(f))
+            ) {
+              abbreviationMatched = true;
+            }
+          }
+        });
+
+        if (abbreviationMatched) {
+          return { ...profile, matchScore: 95 };
+        }
+
+        let score = 0;
+
+        // Extract city names (first part before comma)
+        const searchCity = search
+          .split(",")[0]
+          .trim()
+          .replace("county", "")
+          .trim();
+        const profileCity = profileLoc
+          .split(",")[0]
+          .trim()
+          .replace("county", "")
+          .trim();
+
+        // If cities match exactly
+        if (searchCity === profileCity) {
+          score = 90;
+        }
+        // If one contains the other
+        else if (
+          profileLoc.includes(searchCity) ||
+          search.includes(profileCity)
+        ) {
+          score = 70;
+        }
+        // Check for word overlap
+        else {
+          const searchWords = new Set(
+            search.split(/[,\s]+/).filter((w) => w.length > 2)
+          );
+          const profileWords = new Set(
+            profileLoc.split(/[,\s]+/).filter((w) => w.length > 2)
+          );
+
+          let matches = 0;
+          searchWords.forEach((word) => {
+            if (profileWords.has(word)) matches++;
+          });
+
+          if (matches > 0) {
+            score = (matches / searchWords.size) * 60;
+          }
+        }
+
         return { ...profile, matchScore: score };
       })
       .filter((profile) => profile.matchScore > 0)
       .sort((a, b) => b.matchScore - a.matchScore);
 
-    // Determine match level for UI feedback
+    // Rest of your existing logic...
     if (scoredProfiles.length > 0) {
       const bestMatch = scoredProfiles[0].matchScore;
       if (bestMatch >= 80) setCurrentMatchLevel("exact");

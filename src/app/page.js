@@ -73,7 +73,7 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-16 relative">
+      <section className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-16 relative z-50">
         <div
           className={`max-w-6xl mx-auto text-center transition-all duration-1000 delay-300 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
@@ -86,14 +86,17 @@ export default function Home() {
           </div>
 
           <h1 className="text-5xl sm:text-7xl font-bold text-white mb-6 leading-tight">
-           Discover Real, Verified
+            Find Your
             <span className="block bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent animate-gradient">
-Independent Escorts Near You            </span>
+              Perfect Match
+            </span>
           </h1>
 
           <p className="text-xl text-pink-100 mb-8 max-w-2xl mx-auto leading-relaxed opacity-90">
-Browse authentic escort profiles, read honest reviews, and book discreetly             <span className="block text-pink-300 font-medium">
-through a secure platform built for privacy, safety, and trusted connections. Find the perfect companion in your city today            </span>
+            Discover exclusive experience with verified professionals.
+            <span className="block text-pink-300 font-medium">
+              Discreet, secure, and unforgettable experiences await.
+            </span>
           </p>
 
           {/* Big Search Bar */}
