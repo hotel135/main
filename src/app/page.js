@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 
 import { FaTwitter, FaInstagram, FaTiktok } from "react-icons/fa";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function Home() {
   const [isVisible, setIsVisible] = useState(false);
@@ -31,7 +32,7 @@ export default function Home() {
 
       {/* Navigation */}
       <nav
-        className={`relative bg-black/20 backdrop-blur-md border-b border-pink-500/30 sticky top-0 z-50 transition-all duration-1000 ${
+        className={`relative bg-white backdrop-blur-md border-b border-pink-500/30 sticky top-0 z-50 transition-all duration-1000 ${
           isVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
         }`}
       >
@@ -39,25 +40,32 @@ export default function Home() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-2">
-                <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
+                {/* <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <Shield className="h-6 w-6 text-white" />
                 </div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent animate-gradient hidden md:block">
                   MeetAnEscort
-                </h1>
+                </h1> */}
+                <Image
+                  width={250}
+                  height={250}
+                  src="/logo.png" // Direct path from public folder
+                  alt="MeetAnEscort"
+                  className=""
+                />
               </Link>
             </div>
             <div className="flex items-center space-x-4">
               <Link
                 target="_blank"
                 href="https://meetanescort.info/"
-                className="text-pink-200 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-pink-500/20 hover:scale-105"
+                className="text-pink-600 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-pink-500/20 hover:scale-105"
               >
                 Blog
               </Link>
               <Link
                 href="/login"
-                className="text-pink-200 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-pink-500/20 hover:scale-105"
+                className="text-pink-600 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-pink-500/20 hover:scale-105"
               >
                 Login
               </Link>

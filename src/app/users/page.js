@@ -1,4 +1,4 @@
-// pages/admin/bulk-create-users.js - WITH BIO SUPPORT
+// pages/admin/bulk-create-users.js - WITH ADS CREATION
 "use client";
 import { useState } from "react";
 import { db } from "../../lib/firebase";
@@ -8,6 +8,7 @@ export default function BulkCreateUsers() {
   const [usersData, setUsersData] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState([]);
+  const [createAds, setCreateAds] = useState(true); // Toggle for creating ads
 
   // Generate random phone number
   const generateRandomPhone = () => {
@@ -122,6 +123,32 @@ export default function BulkCreateUsers() {
       `Sophisticated and elegant ${displayName} specializing in premium companionship for gentlemen who value quality and discretion.`,
     ];
     return bios[Math.floor(Math.random() * bios.length)];
+  };
+
+  // Generate random ad title
+  const generateAdTitle = (displayName) => {
+    const titles = [
+      `Premium Companion ${displayName} - Luxury Encounters`,
+      `Elite Escort ${displayName} - Discreet Services`,
+      `${displayName} - Sophisticated Companion`,
+      `Luxury Model ${displayName} - Premium Services`,
+      `${displayName} - Exclusive Companion Experience`,
+      `Premium ${displayName} - Elite Encounters`,
+      `${displayName} - Luxury Dating Companion`,
+    ];
+    return titles[Math.floor(Math.random() * titles.length)];
+  };
+
+  // Generate random ad description
+  const generateAdDescription = (displayName, bio) => {
+    const descriptions = [
+      `Experience luxury companionship with ${displayName}. Professional, discreet, and focused on creating memorable encounters. Available for incall and outcall services.`,
+      `${displayName} offers premium companionship services for discerning clients. Elegant, sophisticated, and committed to providing exceptional experiences.`,
+      `Book an unforgettable experience with ${displayName}. Professional model and companion offering luxury services in a safe, comfortable environment.`,
+      `${displayName} - Your premium choice for sophisticated companionship. Discreet, professional, and dedicated to client satisfaction.`,
+      `Luxury encounters with ${displayName}. Experience the finest companionship services with attention to detail and client preferences.`,
+    ];
+    return descriptions[Math.floor(Math.random() * descriptions.length)];
   };
 
   // Parse the bulk data input - WITH BIO SUPPORT
@@ -405,13 +432,73 @@ export default function BulkCreateUsers() {
           const userId = `user_${Date.now()}_${i}`;
           await setDoc(doc(db, "users", userId), userData);
 
-          newResults.push(
-            `✅ ${displayName} | ${userData.location} | Age: ${
-              userData.age
-            } | $${userData.incallPrice} | ${
-              userData.photos?.length || 0
-            } photos`
-          );
+          // CREATE AD FOR THIS USER
+          if (createAds) {
+            const adData = {
+              // Link to user
+              userId: userId,
+
+              // Ad-specific data
+              title: generateAdTitle(displayName),
+              description: generateAdDescription(displayName, userData.bio),
+              location: userData.location,
+              priceRange: userData.incallPrice,
+
+              // Use first photo for ad, or random placeholder
+              selectedPhoto:
+                userData.photos?.[0]?.url ||
+                "https://via.placeholder.com/400x600",
+
+              // Ad-specific fields
+              status: "active",
+              priority: 0, // Can be set by admin later
+              isFeatured: false, // Can be set by admin later
+              featuredOrder: 999,
+
+              // Stats
+              views: Math.floor(Math.random() * 100),
+              clicks: Math.floor(Math.random() * 20),
+              impressions: Math.floor(Math.random() * 500),
+
+              // Services
+              services: userData.services || ["incall", "outcall"],
+              age: userData.age,
+              contactPhone: userData.contactPhone,
+
+              // Timestamps
+              createdAt: new Date(),
+              lastPaymentDate: new Date(),
+              lastUpdated: new Date(),
+              boostUntil: null,
+
+              // Additional ad info
+              bio:
+                userData.bio?.substring(0, 200) +
+                (userData.bio?.length > 200 ? "..." : ""),
+              category: "companion",
+              tags: ["premium", "verified", "new"],
+            };
+
+            // Create ad document
+            const adId = `ad_${Date.now()}_${i}`;
+            await setDoc(doc(db, "ads", adId), adData);
+
+            newResults.push(
+              `✅ ${displayName} | ${userData.location} | Age: ${
+                userData.age
+              } | $${userData.incallPrice} | ${
+                userData.photos?.length || 0
+              } photos | 📢 AD CREATED`
+            );
+          } else {
+            newResults.push(
+              `✅ ${displayName} | ${userData.location} | Age: ${
+                userData.age
+              } | $${userData.incallPrice} | ${
+                userData.photos?.length || 0
+              } photos`
+            );
+          }
         } catch (error) {
           newResults.push(
             `❌ Error creating ${user.displayName}: ${error.message}`
@@ -420,7 +507,11 @@ export default function BulkCreateUsers() {
       }
 
       setResults(newResults);
-      alert(`Successfully created ${parsedUsers.length} users!`);
+      alert(
+        `Successfully created ${parsedUsers.length} users${
+          createAds ? " and ads" : ""
+        }!`
+      );
     } catch (error) {
       alert(`Error: ${error.message}`);
     } finally {
@@ -510,7 +601,7 @@ photos: https://example.com/emma1.jpg`;
     <div className="min-h-screen bg-gray-100 p-6 text-black">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">
-          Auto-Generate User Creator
+          Auto-Generate User & Ad Creator
         </h1>
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -518,9 +609,33 @@ photos: https://example.com/emma1.jpg`;
             🚀 Auto-Generate Mode
           </h2>
           <p className="text-blue-700">
-            Just provide <strong>name, photos, and location</strong>. Add custom{" "}
-            <strong>bio</strong> if you want! Everything else auto-generates.
+            Creates <strong>users + ads automatically</strong>. Just provide
+            name, photos, and location!
           </p>
+        </div>
+
+        {/* Toggle for creating ads */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">
+                Create Ads Automatically
+              </h3>
+              <p className="text-gray-600">
+                When enabled, each user will also get an active ad that appears
+                in the ads section.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={createAds}
+                onChange={(e) => setCreateAds(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
         </div>
 
         {/* Quick Location Buttons */}
@@ -585,12 +700,11 @@ location: Houston, TX, US
 photos: https://example.com/photo3.jpg
 
 ✅ Auto-generates:
-• Email (name@gmail.com)
-• Website (www.name.com)  
-• Age (20-30), Height, Body Type
-• Ethnicity, Hair Color, Eye Color  
-• Languages, Prices, Phone
-• Bio (if not provided)
+• User profile with all details
+• Active ad linked to user
+• Email, website, contact info
+• Age, physical attributes
+• Pricing, services, availability
 • And everything else!`}
             rows={15}
             className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -603,8 +717,8 @@ photos: https://example.com/photo3.jpg
               className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               {isLoading
-                ? "Creating Users..."
-                : "✨ Create Users (Auto-Generate)"}
+                ? "Creating Users & Ads..."
+                : `✨ Create Users ${createAds ? "+ Ads" : ""}`}
             </button>
 
             <button

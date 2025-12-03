@@ -25,24 +25,24 @@ export default function FeaturedProfiles() {
 
   const loadFeaturedProfiles = async () => {
     try {
-      // Query active ads directly
+      // Query ONLY ads that admin has manually selected
       const adsQuery = query(
         collection(db, "ads"),
         where("status", "==", "active"),
-        orderBy("priority", "desc"), // Sort by priority (boosted ads first)
-        orderBy("lastPaymentDate", "desc"), // Then by payment date
+        where("isFeatured", "==", true), // ← ONLY ADMIN-SELECTED ADS
+        orderBy("featuredOrder", "asc"), // ← SORT BY ADMIN'S RANKING
         limit(20)
       );
 
       const adsSnapshot = await getDocs(adsQuery);
 
       if (adsSnapshot.empty) {
-        // Fallback to regular profiles if no ads
-        await loadRegularProfiles();
+        // NO FALLBACK - Show empty if admin hasn't selected any ads
+        setFeaturedProfiles([]);
         return;
       }
 
-      // Process ads and enrich with user data if needed
+      // Process ads and enrich with user data
       const adsData = await Promise.all(
         adsSnapshot.docs.map(async (adDoc) => {
           const adData = adDoc.data();
@@ -77,7 +77,7 @@ export default function FeaturedProfiles() {
             services: adData.services || [],
             contactPhone: adData.contactPhone,
             boostUntil: adData.boostUntil,
-            priority: adData.priority,
+            featuredOrder: adData.featuredOrder || 999, // Default high number for unsorted
           };
         })
       );
@@ -85,8 +85,7 @@ export default function FeaturedProfiles() {
       setFeaturedProfiles(adsData);
     } catch (error) {
       console.error("Error loading featured profiles:", error);
-      // Fallback to regular profiles
-      await loadRegularProfiles();
+      setFeaturedProfiles([]);
     } finally {
       setLoading(false);
     }

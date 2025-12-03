@@ -16,6 +16,7 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState(null);
   const [activeTab, setActiveTab] = useState("photos");
+  const [copied, setCopied] = useState(false);
 
   // Load profile data
   useEffect(() => {
@@ -166,6 +167,8 @@ export default function ProfilePage() {
 
 // Profile Overview Component
 function ProfileOverview({ profile }) {
+  const [copied, setCopied] = useState(false);
+
   const bio = profile.bio ? profile.bio : "Bio";
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -178,6 +181,40 @@ function ProfileOverview({ profile }) {
 
   const displayText = isExpanded ? bio : bio.slice(0, 120);
   const needsTruncation = bio.length > 120;
+
+  const handleCopyPhoneNumber = async () => {
+    const phoneNumber = profile.contactPhone || profile.phone;
+
+    if (!phoneNumber) {
+      alert("Phone number not available for this profile");
+      return;
+    }
+
+    // Clean the phone number
+    const cleanPhoneNumber = phoneNumber.replace(/[^\d+]/g, "");
+
+    try {
+      await navigator.clipboard.writeText(cleanPhoneNumber);
+      setCopied(true);
+
+      // Reset "Copied" text after 2 seconds
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = cleanPhoneNumber;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   const handleSendMessage = () => {
     // Get the phone number from profile (you might need to adjust this field name)
     const phoneNumber = profile.contactPhone || profile.phone;
@@ -240,7 +277,7 @@ function ProfileOverview({ profile }) {
           )}
         </div>{" "}
         <div className="flex items-center justify-center space-x-4 text-pink-200 mb-4">
-          <span>📍 {profile.location}</span>
+          {/* <span>📍 {profile.location}</span> */}
           <span>👤 {profile.age}</span>
         </div>
         <div className="flex justify-center space-x-2 mb-4">
@@ -307,12 +344,50 @@ function ProfileOverview({ profile }) {
           </a>
         )}
 
-        <button
-          onClick={handleSendMessage}
-          className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition duration-300 mt-4"
-        >
-          💌 Send Message
-        </button>
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={handleSendMessage}
+            className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition duration-300 flex items-center justify-center gap-2"
+          >
+            💌 Send Message
+          </button>
+
+          <button
+            onClick={handleCopyPhoneNumber}
+            className="px-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition duration-300 flex items-center justify-center"
+            title="Copy Phone Number"
+          >
+            {copied ? (
+              <svg
+                className="w-5 h-5 text-green-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-5 h-5 text-gray-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

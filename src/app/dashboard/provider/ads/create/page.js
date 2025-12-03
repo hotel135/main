@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useAds } from "@/context/AdsContext";
 import { useSimpleWallet } from "@/context/SimpleWalletContext";
-import LocationSearch from "@/components/ui/LocationSearch";
+import LocationSearch from "@/components/ui/Locations";
 import { useRouter } from "next/navigation";
 
 export default function CreateAdPage() {

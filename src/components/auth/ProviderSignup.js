@@ -1,6 +1,6 @@
 // src/components/auth/ProviderSignup.js
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
@@ -16,7 +16,12 @@ export default function ProviderSignup() {
     email: "",
     password: "",
     confirmPassword: "",
-    bio: "", // Add this line
+    bio: "",
+
+    // OTP Verification
+    otp: "",
+    otpInput: "",
+    isEmailVerified: false,
 
     // Location & Services
     location: "",
@@ -30,10 +35,9 @@ export default function ProviderSignup() {
     hairColor: "",
     shoeSize: "",
     eyeColor: "",
-    profileComplete: false, // Will be true after photo upload
-    vdoc: true, // Will be true after admin approve
-
-    verified: true, // Will be true after admin approve
+    profileComplete: false,
+    vdoc: true,
+    verified: true,
     languages: ["English"],
 
     // Availability
@@ -64,7 +68,6 @@ export default function ProviderSignup() {
     website: "",
     phone: "",
     preferredContact: "whatsapp",
-    website: "",
     instagram: "",
     twitter: "",
     agreeToTerms: false,
@@ -73,15 +76,84 @@ export default function ProviderSignup() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
   const router = useRouter();
 
-  const locations = [
-    "Miami, Florida, United States",
-    "Los Angeles, California, United States",
-    "Las Vegas, Nevada, United States",
-    "New York, New York, United States",
-    "Chicago, Illinois, United States",
-  ];
+  // OTP Cooldown timer
+  useEffect(() => {
+    if (otpCooldown > 0) {
+      const timer = setTimeout(() => setOtpCooldown(otpCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCooldown]);
+
+  // Generate OTP
+  const generateOTP = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
+  // Send OTP
+  const sendOTP = async (email) => {
+    setOtpLoading(true);
+    setError("");
+
+    try {
+      const otp = generateOTP();
+
+      // Store OTP in formData for verification
+      setFormData((prev) => ({ ...prev, otp }));
+
+      const response = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send OTP");
+      }
+
+      setOtpSent(true);
+      setOtpCooldown(60); // 60 seconds cooldown
+    } catch (error) {
+      setError(error.message || "Failed to send OTP. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // Verify OTP
+  const verifyOTP = () => {
+    if (!formData.otpInput || formData.otpInput.length !== 6) {
+      setError("Please enter a valid 6-digit OTP");
+      return;
+    }
+
+    if (formData.otpInput === formData.otp) {
+      setFormData((prev) => ({
+        ...prev,
+        isEmailVerified: true,
+        otp: "", // Clear OTP from state for security
+      }));
+      setError("");
+      setCurrentStep(2); // Move to profile details after verification
+    } else {
+      setError("Invalid OTP code. Please try again.");
+    }
+  };
+
+  // Resend OTP
+  const resendOTP = () => {
+    if (otpCooldown === 0) {
+      sendOTP(formData.email);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -106,12 +178,24 @@ export default function ProviderSignup() {
       setError(validationError);
       return;
     }
+
+    // Special handling for step 1 - send OTP
+    if (currentStep === 1 && !formData.isEmailVerified) {
+      sendOTP(formData.email);
+      setCurrentStep(1.5); // OTP verification step
+      return;
+    }
+
     setCurrentStep((prev) => prev + 1);
     setError("");
   };
 
   const prevStep = () => {
-    setCurrentStep((prev) => prev - 1);
+    if (currentStep === 1.5) {
+      setCurrentStep(1);
+    } else {
+      setCurrentStep((prev) => prev - 1);
+    }
     setError("");
   };
 
@@ -132,6 +216,11 @@ export default function ProviderSignup() {
         }
         if (formData.password !== formData.confirmPassword) {
           return "Passwords do not match";
+        }
+        break;
+      case 1.5: // OTP verification step
+        if (!formData.isEmailVerified) {
+          return "Please verify your email first";
         }
         break;
       case 2:
@@ -155,15 +244,9 @@ export default function ProviderSignup() {
         if (!formData.incallHours?.trim()) {
           return "Please specify incall hours/duration";
         }
-        // if (!formData.incallPrice || parseFloat(formData.incallPrice) <= 0) {
-        //   return "Please enter a valid incall price";
-        // }
         if (!formData.outcallHours?.trim()) {
           return "Please specify outcall hours/duration";
         }
-        // if (!formData.outcallPrice || parseFloat(formData.outcallPrice) <= 0) {
-        //   return "Please enter a valid outcall price";
-        // }
         break;
       case 4:
         if (!formData.phone) {
@@ -198,6 +281,11 @@ export default function ProviderSignup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!formData.isEmailVerified) {
+      setError("Please verify your email first");
+      return;
+    }
+
     // Only check terms agreement on the final step
     if (currentStep === 4 && !formData.agreeToTerms) {
       setError("You must agree to the platform policies");
@@ -228,8 +316,7 @@ export default function ProviderSignup() {
       // Prepare user data for Firestore
       const userData = {
         userType: "provider",
-        bio: formData.bio.trim(), // Add this line
-
+        bio: formData.bio.trim(),
         displayName: formData.displayName.trim(),
         email: formData.email.trim(),
         location: formData.location,
@@ -248,13 +335,14 @@ export default function ProviderSignup() {
         incallPrice: formData.incallPrice,
         outcallPrice: formData.outcallPrice,
         website: formData.website,
-        // PHONE NUMBER FIELDS - ADD THESE
-        phone: formData.phone, // This is the main phone number
-        contactPhone: formData.phone, // Also save as contactPhone for consistency        agreeToTerms: formData.agreeToTerms,
+        phone: formData.phone,
+        contactPhone: formData.phone,
+        agreeToTerms: formData.agreeToTerms,
         createdAt: new Date(),
         lastActive: new Date(),
         profileComplete: true,
         verified: true,
+        emailVerified: true, // Add this field to track email verification
       };
 
       // Remove empty fields
@@ -267,6 +355,7 @@ export default function ProviderSignup() {
           delete userData[key];
         }
       });
+
       await setDoc(doc(db, "users", userCredential.user.uid), userData);
 
       router.push("/dashboard/provider");
@@ -345,7 +434,85 @@ export default function ProviderSignup() {
     </div>
   );
 
-  // Step 2: Profile Details
+  // Step 1.5: OTP Verification
+  const renderOTPStep = () => (
+    <div className="space-y-6">
+      <div className="bg-black/20 rounded-xl p-6 border border-pink-500/20 text-center">
+        <div className="w-16 h-16 bg-pink-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg
+            className="w-8 h-8 text-pink-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+            />
+          </svg>
+        </div>
+
+        <h3 className="text-xl font-bold text-pink-300 mb-2">
+          Verify Your Email
+        </h3>
+        <p className="text-pink-200 mb-4">
+          We sent a 6-digit verification code to:
+          <br />
+          <span className="font-semibold">{formData.email}</span>
+        </p>
+
+        <div className="max-w-xs mx-auto">
+          <label className="block text-sm font-medium text-pink-200 mb-2">
+            Enter OTP Code *
+          </label>
+          <input
+            type="text"
+            name="otpInput"
+            value={formData.otpInput || ""}
+            onChange={handleChange}
+            maxLength={6}
+            pattern="[0-9]*"
+            inputMode="numeric"
+            className="w-full px-4 py-3 bg-black/20 border border-pink-500/30 rounded-xl text-white text-center text-2xl font-mono tracking-widest focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400 transition duration-200"
+            placeholder="000000"
+            required
+          />
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <button
+            type="button"
+            onClick={verifyOTP}
+            disabled={
+              !formData.otpInput || formData.otpInput.length !== 6 || loading
+            }
+            className="w-full max-w-xs mx-auto px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-medium hover:from-pink-600 hover:to-purple-700 transition duration-200 disabled:opacity-50"
+          >
+            {loading ? "Verifying..." : "Verify Email"}
+          </button>
+
+          <div className="text-sm text-pink-300/70">
+            Didn&apos;t receive the code?{" "}
+            <button
+              type="button"
+              onClick={resendOTP}
+              disabled={otpCooldown > 0 || otpLoading}
+              className="text-pink-400 hover:text-pink-300 underline disabled:opacity-50"
+            >
+              {otpLoading
+                ? "Sending..."
+                : otpCooldown > 0
+                ? `Resend in ${otpCooldown}s`
+                : "Resend OTP"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // Step 2: Profile Details with Location Search
   const renderStep2 = () => (
     <div className="space-y-6">
@@ -421,7 +588,6 @@ export default function ProviderSignup() {
         </div>
       </div>
 
-      {/* Rest of your existing fields remain the same */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-pink-200 mb-2">
@@ -484,7 +650,6 @@ export default function ProviderSignup() {
         </div>
       </div>
 
-      {/* About Me Section - Added Here */}
       <div>
         <label className="block text-sm font-medium text-pink-200 mb-2">
           About Me *
@@ -791,6 +956,7 @@ export default function ProviderSignup() {
       </div>
     </div>
   );
+
   // Step 4: Final Details
   const renderStep4 = () => (
     <div className="space-y-6">
@@ -942,10 +1108,21 @@ export default function ProviderSignup() {
 
   const steps = [
     { number: 1, title: "Basic Info", component: renderStep1 },
+    { number: 1.5, title: "Email Verification", component: renderOTPStep },
     { number: 2, title: "Profile Details", component: renderStep2 },
     { number: 3, title: "Pricing & Availability", component: renderStep3 },
     { number: 4, title: "Final Details", component: renderStep4 },
   ];
+
+  const getProgressPercentage = () => {
+    const adjustedStep = currentStep >= 1.5 ? currentStep - 0.5 : currentStep;
+    return ((adjustedStep - 1) / (steps.length - 2)) * 100;
+  };
+
+  const getCurrentStepTitle = () => {
+    if (currentStep === 1.5) return "Email Verification";
+    return steps.find((step) => step.number === currentStep)?.title || "";
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -955,42 +1132,47 @@ export default function ProviderSignup() {
         <div className="block md:hidden">
           <div className="flex justify-between items-center mb-2">
             <div className="text-sm text-pink-300">
-              Step {currentStep} of {steps.length}
+              Step {currentStep === 1.5 ? "1.5" : currentStep} of{" "}
+              {steps.length - 1}
             </div>
             <div className="text-sm text-pink-200 font-medium">
-              {steps[currentStep - 1].title}
+              {getCurrentStepTitle()}
             </div>
           </div>
           <div className="w-full bg-pink-500/20 rounded-full h-2">
             <div
               className="bg-gradient-to-r from-pink-500 to-purple-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(currentStep / steps.length) * 100}%` }}
+              style={{ width: `${getProgressPercentage()}%` }}
             ></div>
           </div>
         </div>
 
         {/* Desktop View - Full Steps */}
         <div className="hidden md:flex justify-between items-center">
-          {steps.map((step, index) => (
-            <div key={step.number} className="flex items-center">
-              <div
-                className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${
-                  currentStep >= step.number
-                    ? "bg-pink-500 border-pink-500 text-white shadow-lg"
-                    : "border-pink-500/30 text-pink-500/30"
-                }`}
-              >
-                {step.number}
-              </div>
-              {index < steps.length - 1 && (
+          {steps
+            .filter((step) => step.number !== 1.5)
+            .map((step, index) => (
+              <div key={step.number} className="flex items-center">
                 <div
-                  className={`w-16 h-0.5 mx-2 transition-all duration-300 ${
-                    currentStep > step.number ? "bg-pink-500" : "bg-pink-500/30"
+                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${
+                    currentStep >= step.number
+                      ? "bg-pink-500 border-pink-500 text-white shadow-lg"
+                      : "border-pink-500/30 text-pink-500/30"
                   }`}
-                ></div>
-              )}
-            </div>
-          ))}
+                >
+                  {step.number}
+                </div>
+                {index < steps.length - 2 && (
+                  <div
+                    className={`w-16 h-0.5 mx-2 transition-all duration-300 ${
+                      currentStep > step.number
+                        ? "bg-pink-500"
+                        : "bg-pink-500/30"
+                    }`}
+                  ></div>
+                )}
+              </div>
+            ))}
         </div>
       </div>
 
@@ -1016,9 +1198,9 @@ export default function ProviderSignup() {
       {/* Current Step Content */}
       <div>
         <h3 className="text-lg font-semibold text-white mb-4 hidden md:block">
-          {steps[currentStep - 1].title}
+          {getCurrentStepTitle()}
         </h3>
-        {steps[currentStep - 1].component()}
+        {steps.find((step) => step.number === currentStep)?.component()}
       </div>
 
       {/* Navigation Buttons */}
@@ -1032,40 +1214,45 @@ export default function ProviderSignup() {
           Previous
         </button>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-medium hover:from-pink-600 hover:to-purple-700 transition duration-200 disabled:opacity-50 flex-1 md:flex-none"
-        >
-          {loading ? (
-            <div className="flex items-center justify-center">
-              <svg
-                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              Processing...
-            </div>
-          ) : currentStep === 4 ? (
-            "Complete Registration"
-          ) : (
-            "Next Step"
-          )}
-        </button>
+        {currentStep !== 1.5 ? (
+          <button
+            type={currentStep === 4 ? "submit" : "button"}
+            onClick={currentStep === 4 ? undefined : nextStep}
+            disabled={loading}
+            className="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-medium hover:from-pink-600 hover:to-purple-700 transition duration-200 disabled:opacity-50 flex-1 md:flex-none"
+          >
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <svg
+                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Processing...
+              </div>
+            ) : currentStep === 4 ? (
+              "Complete Registration"
+            ) : (
+              "Next Step"
+            )}
+          </button>
+        ) : (
+          <div className="flex-1"></div> // Empty space for OTP step
+        )}
       </div>
     </form>
   );

@@ -113,6 +113,11 @@ export default function UploadPhotos() {
 
       // Redirect to dashboard
       router.push("/dashboard/provider");
+
+      // Force reload after a short delay to ensure navigation happens
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     } catch (error) {
       console.error("Upload error:", error);
       setError(`Upload failed: ${error.message}`);

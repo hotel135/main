@@ -90,9 +90,9 @@ const ProfileCard = memo(function ProfileCard({ profile }) {
           </div>
 
           {/* Location */}
-          <p className="text-pink-200 text-sm mb-3 truncate" title={location}>
+          {/* <p className="text-pink-200 text-sm mb-3 truncate" title={location}>
             📍 {location}
-          </p>
+          </p> */}
 
           {/* Bio Section */}
           {bio !== "No bio provided yet." && (
