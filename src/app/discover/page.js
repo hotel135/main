@@ -304,11 +304,11 @@ export default function DiscoverPage({ initialLocation = "" }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black relative overflow-hidden">
       {/* Background Elements */}
-      <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-purple-500/5"></div>
+      {/* <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-purple-500/5"></div> */}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         {/* Back Button */}
-        <div className="fixed top-4 right-4 z-50">
+        <div className="fixed top-4 right-4 z-30">
           <Link
             href="/"
             className="group border-2 border-pink-500/50 text-pink-300 px-8 py-4 rounded-xl font-semibold hover:bg-pink-500/10 hover:border-pink-400 transition-all duration-300 transform hover:scale-105 hover:text-white flex items-center gap-2"
