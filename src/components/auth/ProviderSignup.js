@@ -1038,8 +1038,8 @@ export default function ProviderSignup() {
               <label className="block text-lg font-semibold text-pink-200 mb-3">
                 Instagram
               </label>
-              <div className="flex max-w-md">
-                <span className="px-4 py-3 bg-black/40 border border-pink-500/30 border-r-0 rounded-l-lg text-pink-300 flex items-center">
+              <div className="flex">
+                <span className="px-3 sm:px-4 py-3 bg-black/40 border border-pink-500/30 border-r-0 rounded-l-lg text-pink-300 flex items-center shrink-0">
                   @
                 </span>
                 <input
@@ -1047,7 +1047,7 @@ export default function ProviderSignup() {
                   name="instagram"
                   value={formData.instagram || ""}
                   onChange={handleChange}
-                  className="flex-1 px-4 py-3 bg-black/30 border border-pink-500/30 border-l-0 rounded-r-lg text-white placeholder-gray-400 focus:outline-none focus:border-pink-400 text-lg"
+                  className="flex-1 min-w-0 px-3 sm:px-4 py-3 bg-black/30 border border-pink-500/30 border-l-0 rounded-r-lg text-white placeholder-gray-400 focus:outline-none focus:border-pink-400 text-base sm:text-lg"
                   placeholder="username"
                 />
               </div>
@@ -1057,8 +1057,8 @@ export default function ProviderSignup() {
               <label className="block text-lg font-semibold text-pink-200 mb-3">
                 Twitter
               </label>
-              <div className="flex max-w-md">
-                <span className="px-4 py-3 bg-black/40 border border-pink-500/30 border-r-0 rounded-l-lg text-pink-300 flex items-center">
+              <div className="flex">
+                <span className="px-3 sm:px-4 py-3 bg-black/40 border border-pink-500/30 border-r-0 rounded-l-lg text-pink-300 flex items-center shrink-0">
                   @
                 </span>
                 <input
@@ -1066,7 +1066,7 @@ export default function ProviderSignup() {
                   name="twitter"
                   value={formData.twitter || ""}
                   onChange={handleChange}
-                  className="flex-1 px-4 py-3 bg-black/30 border border-pink-500/30 border-l-0 rounded-r-lg text-white placeholder-gray-400 focus:outline-none focus:border-pink-400 text-lg"
+                  className="flex-1 min-w-0 px-3 sm:px-4 py-3 bg-black/30 border border-pink-500/30 border-l-0 rounded-r-lg text-white placeholder-gray-400 focus:outline-none focus:border-pink-400 text-base sm:text-lg"
                   placeholder="username"
                 />
               </div>
