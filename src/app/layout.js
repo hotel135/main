@@ -6,6 +6,7 @@ import { NowPaymentsWalletProvider } from "@/context/NowPaymentsWalletContext";
 import { SimpleWalletProvider } from "@/context/SimpleWalletContext";
 import { AdsProvider } from "@/context/AdsContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import Script from "next/script";
 
 export const metadata = {
   title: "MeetAnEscort - Premium Escort Dating & Companionship Platform",
@@ -206,6 +207,24 @@ export default function RootLayout({ children }) {
           crossOrigin="anonymous"
         />
         <link rel="dns-prefetch" href="https://i.ibb.co" />
+
+        {/* SmartSupp Chat Script */}
+        <Script
+          id="smartsupp-script"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              var _smartsupp = _smartsupp || {};
+              _smartsupp.key = 'a5a819116fb14c49b4748bea952a243c1bf940dd';
+              window.smartsupp || (function(d) {
+                var s,c,o=smartsupp=function(){ o._.push(arguments)};o._=[];
+                s=d.getElementsByTagName('script')[0];c=d.createElement('script');
+                c.type='text/javascript';c.charset='utf-8';c.async=true;
+                c.src='https://www.smartsuppchat.com/loader.js?';s.parentNode.insertBefore(c,s);
+              })(document);
+            `,
+          }}
+        />
       </head>
 
       <body className="font-sans bg-gradient-to-br from-gray-900 via-purple-900 to-pink-900">
