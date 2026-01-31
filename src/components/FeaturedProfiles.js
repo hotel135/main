@@ -10,6 +10,7 @@ import {
   getDocs,
   getDoc,
   doc,
+  startAfter,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
@@ -25,93 +26,267 @@ export default function FeaturedProfiles() {
 
   const loadFeaturedProfiles = async () => {
     try {
-      // Query ONLY ads that admin has manually selected
+      console.log("Loading featured profiles...");
+
+      // Step 1: Query admin-selected featured ads
       const adsQuery = query(
         collection(db, "ads"),
         where("status", "==", "active"),
-        where("isFeatured", "==", true), // ← ONLY ADMIN-SELECTED ADS
-        orderBy("featuredOrder", "asc"), // ← SORT BY ADMIN'S RANKING
-        limit(20)
+        where("isFeatured", "==", true),
+        limit(20),
       );
 
       const adsSnapshot = await getDocs(adsQuery);
+      console.log(`Found ${adsSnapshot.size} admin-selected ads`);
 
-      if (adsSnapshot.empty) {
-        // NO FALLBACK - Show empty if admin hasn't selected any ads
-        setFeaturedProfiles([]);
-        return;
+      const adminSelectedProfiles = [];
+
+      if (adsSnapshot.size > 0) {
+        // Process admin-selected ads
+        const adsData = await Promise.all(
+          adsSnapshot.docs.map(async (adDoc) => {
+            const adData = adDoc.data();
+
+            // Get user data for each ad
+            let userData = {};
+            try {
+              const userDoc = await getDoc(doc(db, "users", adData.userId));
+              if (userDoc.exists()) {
+                userData = userDoc.data();
+              }
+            } catch (error) {
+              console.log("User data not available for ad:", adDoc.id);
+            }
+
+            return {
+              id: adDoc.id,
+              ...adData,
+              displayName: adData.title || userData.displayName || "Unknown",
+              age: adData.age || userData.age || "N/A",
+              location: adData.location || userData.location || "Unknown",
+              photos: adData.selectedPhoto
+                ? [{ url: adData.selectedPhoto }]
+                : userData.photos || [],
+              verified: userData.verified || false,
+              incallPrice: adData.priceRange || userData.incallPrice,
+              outcallPrice: userData.outcallPrice,
+              isAd: true,
+              isAdminSelected: true,
+              bio: adData.bio || userData.bio,
+              services: adData.services || userData.services || [],
+              contactPhone: adData.contactPhone || userData.contactPhone,
+              boostUntil: adData.boostUntil,
+              featuredOrder: adData.featuredOrder || 999,
+            };
+          }),
+        );
+
+        // Sort by featuredOrder if available
+        adminSelectedProfiles.push(
+          ...adsData.sort(
+            (a, b) => (a.featuredOrder || 999) - (b.featuredOrder || 999),
+          ),
+        );
       }
 
-      // Process ads and enrich with user data
-      const adsData = await Promise.all(
-        adsSnapshot.docs.map(async (adDoc) => {
-          const adData = adDoc.data();
+      // Step 2: If we have less than 20 profiles, fill with regular active ads
+      const remainingSlots = 20 - adminSelectedProfiles.length;
+      console.log(`Remaining slots to fill: ${remainingSlots}`);
 
-          // Try to get additional user data
-          let userData = {};
-          try {
-            const userDoc = await getDoc(doc(db, "users", adData.userId));
-            if (userDoc.exists()) {
-              userData = userDoc.data();
-            }
-          } catch (error) {
-            console.log("User data not available for ad:", adDoc.id);
-          }
+      if (remainingSlots > 0) {
+        const regularProfiles = await loadRegularProfiles(remainingSlots);
+        console.log(`Found ${regularProfiles.length} regular profiles`);
 
-          return {
-            id: adDoc.id,
-            ...adData,
-            // Use ad data primarily, fallback to user data
-            displayName: adData.title || userData.displayName,
-            age: adData.age || userData.age,
-            location: adData.location || userData.location,
-            photos: adData.selectedPhoto
-              ? [{ url: adData.selectedPhoto }]
-              : userData.photos || [],
-            verified: userData.verified || false,
-            incallPrice: adData.priceRange || userData.incallPrice,
-            outcallPrice: userData.outcallPrice,
-            isAd: true,
-            // Additional ad-specific fields
-            bio: adData.bio,
-            services: adData.services || [],
-            contactPhone: adData.contactPhone,
-            boostUntil: adData.boostUntil,
-            featuredOrder: adData.featuredOrder || 999, // Default high number for unsorted
-          };
-        })
-      );
+        // Combine admin-selected + regular profiles
+        const combinedProfiles = [...adminSelectedProfiles, ...regularProfiles];
 
-      setFeaturedProfiles(adsData);
+        setFeaturedProfiles(combinedProfiles);
+      } else {
+        // We already have 20+ admin-selected profiles
+        setFeaturedProfiles(adminSelectedProfiles.slice(0, 20));
+      }
+
+      console.log(`Total profiles loaded: ${featuredProfiles.length}`);
     } catch (error) {
       console.error("Error loading featured profiles:", error);
-      setFeaturedProfiles([]);
+      // Fallback to simpler query
+      await loadFallbackProfiles();
     } finally {
       setLoading(false);
     }
   };
 
-  const loadRegularProfiles = async () => {
+  const loadRegularProfiles = async (limitCount) => {
     try {
-      // Fallback: get recently active profiles
-      const usersQuery = query(
-        collection(db, "users"),
-        where("profileActive", "==", true),
-        where("verified", "==", true),
-        orderBy("lastUpdated", "desc"),
-        limit(12)
+      console.log(`Loading ${limitCount} regular profiles...`);
+
+      // SIMPLIFIED QUERY: Get recently created active ads without complex conditions
+      const adsQuery = query(
+        collection(db, "ads"),
+        where("status", "==", "active"),
+        orderBy("createdAt", "desc"),
+        limit(limitCount * 3), // Get extra to account for filtering
       );
 
-      const usersSnapshot = await getDocs(usersQuery);
-      const usersData = usersSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        isAd: false,
-      }));
+      const adsSnapshot = await getDocs(adsQuery);
+      const regularProfiles = [];
 
-      setFeaturedProfiles(usersData);
+      for (const adDoc of adsSnapshot.docs) {
+        const adData = adDoc.data();
+
+        // Skip if this is already a featured ad
+        if (adData.isFeatured === true) {
+          continue;
+        }
+
+        // Skip if user has no photos/selectedPhoto
+        if (!adData.selectedPhoto) {
+          continue;
+        }
+
+        // Get user data
+        let userData = {};
+        try {
+          const userDoc = await getDoc(doc(db, "users", adData.userId));
+          if (userDoc.exists()) {
+            userData = userDoc.data();
+          }
+        } catch (error) {
+          console.log("User data not available for ad:", adDoc.id);
+        }
+
+        // Skip if user profile is not active (optional check)
+        if (userData.profileActive === false) {
+          continue;
+        }
+
+        regularProfiles.push({
+          id: adDoc.id,
+          ...adData,
+          ...userData,
+          isAd: true,
+          isAdminSelected: false,
+          displayName: adData.title || userData.displayName || "Unknown",
+          age: adData.age || userData.age || "N/A",
+          location: adData.location || userData.location || "Unknown",
+          photos: adData.selectedPhoto
+            ? [{ url: adData.selectedPhoto }]
+            : userData.photos || [],
+          verified: userData.verified || false,
+          incallPrice: adData.priceRange || userData.incallPrice,
+          bio: adData.bio || userData.bio,
+          services: adData.services || userData.services || [],
+        });
+
+        if (regularProfiles.length >= limitCount) break;
+      }
+
+      return regularProfiles;
     } catch (error) {
       console.error("Error loading regular profiles:", error);
+      // If this fails, try an even simpler approach
+      return await loadSimpleProfiles(limitCount);
+    }
+  };
+
+  const loadSimpleProfiles = async (limitCount) => {
+    try {
+      console.log("Trying simple profiles load...");
+      // Even simpler: just get the most recent ads
+      const adsQuery = query(
+        collection(db, "ads"),
+        orderBy("createdAt", "desc"),
+        limit(limitCount),
+      );
+
+      const adsSnapshot = await getDocs(adsQuery);
+      const simpleProfiles = [];
+
+      for (const adDoc of adsSnapshot.docs) {
+        const adData = adDoc.data();
+
+        // Skip featured ads
+        if (adData.isFeatured === true) continue;
+
+        // Get minimal user data
+        let userData = {};
+        try {
+          const userDoc = await getDoc(doc(db, "users", adData.userId));
+          if (userDoc.exists()) {
+            userData = userDoc.data();
+          }
+        } catch (error) {
+          console.log("Simple: User data not available");
+        }
+
+        simpleProfiles.push({
+          id: adDoc.id,
+          ...adData,
+          ...userData,
+          isAd: true,
+          isAdminSelected: false,
+          displayName: adData.title || "Member",
+          age: adData.age || "",
+          location: adData.location || "",
+          photos: adData.selectedPhoto ? [{ url: adData.selectedPhoto }] : [],
+        });
+      }
+
+      return simpleProfiles;
+    } catch (error) {
+      console.error("Error in simple profiles load:", error);
+      return [];
+    }
+  };
+
+  const loadFallbackProfiles = async () => {
+    try {
+      console.log("Using fallback profiles load...");
+      // Last resort: get any ads
+      const adsQuery = query(collection(db, "ads"), limit(20));
+
+      const adsSnapshot = await getDocs(adsQuery);
+      const fallbackProfiles = [];
+
+      for (const adDoc of adsSnapshot.docs) {
+        const adData = adDoc.data();
+
+        let userData = {};
+        try {
+          const userDoc = await getDoc(doc(db, "users", adData.userId));
+          if (userDoc.exists()) {
+            userData = userDoc.data();
+          }
+        } catch (error) {
+          console.log("Fallback: User data not available");
+        }
+
+        fallbackProfiles.push({
+          id: adDoc.id,
+          ...adData,
+          ...userData,
+          isAd: true,
+          isAdminSelected: adData.isFeatured === true,
+          displayName: adData.title || userData.displayName || "Member",
+          age: adData.age || userData.age || "",
+          location: adData.location || userData.location || "",
+          photos: adData.selectedPhoto
+            ? [{ url: adData.selectedPhoto }]
+            : userData.photos || [],
+          verified: userData.verified || false,
+        });
+      }
+
+      // Sort: featured first, then others
+      fallbackProfiles.sort((a, b) => {
+        if (a.isAdminSelected && !b.isAdminSelected) return -1;
+        if (!a.isAdminSelected && b.isAdminSelected) return 1;
+        return 0;
+      });
+
+      setFeaturedProfiles(fallbackProfiles.slice(0, 20));
+    } catch (error) {
+      console.error("Error in fallback load:", error);
       setFeaturedProfiles([]);
     }
   };
@@ -128,7 +303,7 @@ export default function FeaturedProfiles() {
             <h2 className="text-3xl font-bold text-white mb-4">
               Featured Profiles
             </h2>
-            <p className="text-pink-200">Discover our most exclusive members</p>
+            <p className="text-pink-200">Loading featured members...</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
@@ -145,41 +320,57 @@ export default function FeaturedProfiles() {
   }
 
   if (featuredProfiles.length === 0) {
-    return null;
+    return (
+      <section className="py-16 bg-gradient-to-br from-gray-900 to-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Featured Profiles
+          </h2>
+          <p className="text-pink-200">
+            No featured profiles available at the moment.
+          </p>
+        </div>
+      </section>
+    );
   }
 
   return (
     <section className="py-16 bg-gradient-to-br from-gray-900 to-black relative overflow-hidden">
-      {/* Background Elements */}
       <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-purple-500/5"></div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         {/* Section Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center bg-pink-500/20 text-pink-300 px-4 py-2 rounded-full text-sm font-medium border border-pink-500/30 mb-4">
-            ⭐ Promoted Ads
+            {featuredProfiles.some((p) => p.isAdminSelected)
+              ? "⭐ Featured & Active Members"
+              : "⭐ Active Members"}
           </div>
           <h2 className="text-4xl font-bold text-white mb-4">
-            Featured{" "}
-            <span className="bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
-              Profiles
-            </span>
+            {featuredProfiles.some((p) => p.isAdminSelected)
+              ? "Featured Profiles"
+              : "Active Members"}
           </h2>
           <p className="text-xl text-pink-200 max-w-2xl mx-auto">
-            Discover our promoted professionals. Active ads with verified
-            contact information.
+            {featuredProfiles.some((p) => p.isAdminSelected)
+              ? "Discover our featured professionals and community members."
+              : "Browse our active community members."}
+          </p>
+          <p className="text-sm text-gray-400 mt-2">
+            Showing {displayedProfiles.length} of {featuredProfiles.length}{" "}
+            profiles
           </p>
         </div>
 
         {/* Profiles Grid */}
         <div
-          className={`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-6 mb-8 transition-all duration-500 ${
+          className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8 transition-all duration-500 ${
             showAll ? "max-h-full" : "max-h-[800px] overflow-hidden"
           }`}
         >
           {displayedProfiles.map((profile, index) => (
             <FeaturedProfileCard
-              key={profile.id}
+              key={`${profile.id}-${index}`}
               profile={profile}
               index={index}
             />
@@ -194,9 +385,7 @@ export default function FeaturedProfiles() {
               className="group bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-pink-300 px-8 py-3 rounded-xl font-semibold hover:from-pink-500/30 hover:to-purple-500/30 border border-pink-500/30 hover:border-pink-400 transition-all duration-300 transform hover:scale-105"
             >
               <span className="flex items-center justify-center gap-2">
-                {showAll
-                  ? "Show Less"
-                  : `View All ${featuredProfiles.length} Profiles`}
+                {showAll ? "Show Less" : `View More Profiles`}
                 <svg
                   className={`w-4 h-4 transition-transform duration-300 ${
                     showAll ? "rotate-180" : ""
@@ -221,41 +410,46 @@ export default function FeaturedProfiles() {
   );
 }
 
-// Updated Featured Profile Card Component
+// Featured Profile Card Component
 function FeaturedProfileCard({ profile, index }) {
   const mainPhoto = profile.photos?.[0]?.url || profile.selectedPhoto;
   const delay = index * 0.1;
 
+  const profileUrl = profile.userId
+    ? `/profile/${profile.userId}${profile.id !== profile.userId ? `?ad=${profile.id}` : ""}`
+    : `/profile/${profile.id}`;
+
   return (
-    <Link href={`/profile/${profile.userId || profile.id}`}>
+    <Link href={profileUrl}>
       <div
-        className="group relative bg-black/30 rounded-2xl border border-pink-500/20 hover:border-pink-500/40 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl hover:shadow-pink-500/20 overflow-hidden cursor-pointer"
+        className="group relative bg-black/30 rounded-2xl border border-pink-500/20 hover:border-pink-500/40 transition-all duration-500 transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-pink-500/20 overflow-hidden cursor-pointer"
         style={{
           animationDelay: `${delay}s`,
           animation: "fadeInUp 0.6s ease-out forwards",
+          opacity: 0,
         }}
       >
-        {/* Promoted Badge - Always show for ads */}
-        {profile.isAd && (
+        {/* Admin Selected Badge */}
+        {profile.isAdminSelected && (
           <div className="absolute top-3 left-3 z-10">
-            <span className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg animate-pulse">
-              🔥 PROMOTED
+            <span className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg">
+              ⭐ FEATURED
             </span>
           </div>
         )}
 
-        {/* Priority Badge - Show high priority ads */}
-        {profile.priority > 1761062782 && (
-          <div className="absolute top-3 right-3 z-10">
-            <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg">
-              ⚡ BOOSTED
+        {/* Regular Profile Badge */}
+        {!profile.isAdminSelected && profile.isAd && (
+          <div className="absolute top-3 left-3 z-10">
+            <span className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+              🔥 ACTIVE
             </span>
           </div>
         )}
 
         {/* Verified Badge */}
         {profile.verified && (
-          <div className="absolute top-12 right-3 z-10">
+          <div className="absolute top-3 right-3 z-10">
             <span className="bg-green-500 text-white p-1 rounded-full shadow-lg">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path
@@ -275,6 +469,11 @@ function FeaturedProfileCard({ profile, index }) {
               src={mainPhoto}
               alt={profile.displayName}
               className="w-full h-full object-cover group-hover:scale-110 transition duration-700"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src =
+                  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%232d3748'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial' font-size='16' fill='%239f7aea' text-anchor='middle' dy='.3em'%3E👤%3C/text%3E%3C/svg%3E";
+              }}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-pink-500/20 to-purple-500/20 flex items-center justify-center">
@@ -290,46 +489,52 @@ function FeaturedProfileCard({ profile, index }) {
         <div className="p-4">
           <div className="flex justify-between items-start mb-2">
             <h3 className="font-bold text-white text-sm truncate flex-1">
-              {profile.displayName}
+              {profile.displayName || "Member"}
             </h3>
-            <span className="bg-pink-500/20 text-pink-300 px-2 py-1 rounded text-xs ml-2 whitespace-nowrap">
-              {profile.age}
-            </span>
+            {profile.age && (
+              <span className="bg-pink-500/20 text-pink-300 px-2 py-1 rounded text-xs ml-2 whitespace-nowrap">
+                {profile.age}
+              </span>
+            )}
           </div>
 
-          <p
-            className="text-pink-200 text-xs mb-3 truncate"
-            title={profile.location}
-          >
-            📍 {profile.location}
-          </p>
+          {profile.location && (
+            <p
+              className="text-pink-200 text-xs mb-3 truncate"
+              title={profile.location}
+            >
+              📍 {profile.location}
+            </p>
+          )}
 
           {/* Services Badges */}
-          <div className="flex flex-wrap gap-1 mb-2">
-            {profile.services?.includes("incall") && (
-              <span className="bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded text-xs">
-                Incall
-              </span>
-            )}
-            {profile.services?.includes("outcall") && (
-              <span className="bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded text-xs">
-                Outcall
-              </span>
-            )}
-            {profile.services?.includes("video") && (
-              <span className="bg-green-500/20 text-green-300 px-1.5 py-0.5 rounded text-xs">
-                Video
-              </span>
-            )}
-          </div>
+          {profile.services && profile.services.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {profile.services.includes("incall") && (
+                <span className="bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded text-xs">
+                  Incall
+                </span>
+              )}
+              {profile.services.includes("outcall") && (
+                <span className="bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded text-xs">
+                  Outcall
+                </span>
+              )}
+              {profile.services.includes("video") && (
+                <span className="bg-green-500/20 text-green-300 px-1.5 py-0.5 rounded text-xs">
+                  Video
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-between items-center">
             <span className="text-green-400 font-semibold text-sm">
               {profile.incallPrice
                 ? `$${profile.incallPrice}`
                 : profile.priceRange
-                ? `$${profile.priceRange}`
-                : "Contact"}
+                  ? `$${profile.priceRange}`
+                  : "Contact"}
             </span>
 
             {/* Ad Stats */}
@@ -353,3 +558,17 @@ function FeaturedProfileCard({ profile, index }) {
     </Link>
   );
 }
+
+// Add CSS for animation
+const styles = `
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+`;

@@ -7,14 +7,14 @@ export const FIXED_AMOUNTS = [
   { amount: 500, id: "amount_500", description: "$500 Deposit" },
 ];
 
-// Your NowPayments payment links (you'll get these from your NowPayments dashboard)
-export const PAYMENT_LINKS = {
-  50: "https://nowpayments.io/payment/?iid=5734775603",
-  100: "https://nowpayments.io/payment/?iid=5151315238",
-  200: "https://nowpayments.io/payment/?iid=5320138310",
-  300: "https://nowpayments.io/payment/?iid=6007528789",
-  500: "https://nowpayments.io/payment/?iid=4707117736",
-};
+// // Your NowPayments payment links (you'll get these from your NowPayments dashboard)
+// export const PAYMENT_LINKS = {
+//   50: "https://nowpayments.io/payment/?iid=5734775603",
+//   100: "https://nowpayments.io/payment/?iid=5151315238",
+//   200: "https://nowpayments.io/payment/?iid=5320138310",
+//   300: "https://nowpayments.io/payment/?iid=6007528789",
+//   500: "https://nowpayments.io/payment/?iid=4707117736",
+// };
 
 // NowPayments IPN settings
 export const IPN_CONFIG = {

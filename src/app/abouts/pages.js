@@ -24,8 +24,9 @@ export default function AboutPage() {
                   Who We Are
                 </h2>
                 <p className="leading-relaxed">
-                  empower independent escorts (&quot;Providers&quot;) to showcase their
-                  services and connect with clients (&quot;Users&quot;). We are not an
+                  MeetAnEscort.com is an advertising platform designed to
+                  empower independent escorts ("Providers") to showcase their
+                  services and connect with clients ("Users"). We are not an
                   escort agency, nor do we employ Providers.
                 </p>
               </div>

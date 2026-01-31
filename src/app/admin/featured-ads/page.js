@@ -367,7 +367,7 @@ export default function FeaturedAdsAdmin() {
               All Active Ads ({filteredAds.length})
             </h2>
             <p className="text-gray-400 text-sm">
-              Click &quot;Add to Featured&quot; to manually select ads
+              Click "Add to Featured" to manually select ads
             </p>
           </div>
 

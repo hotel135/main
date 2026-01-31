@@ -6,6 +6,66 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 // Define apiCache OUTSIDE the component (so it persists between renders)
 const apiCache = new Map();
 
+// Random city pool to draw from when we need to fill up to 20
+const randomCityPool = [
+  // Major global cities
+  { display: "New York", search: "New York, USA" },
+  { display: "London", search: "London, UK" },
+  { display: "Tokyo", search: "Tokyo, Japan" },
+  { display: "Paris", search: "Paris, France" },
+  { display: "Dubai", search: "Dubai, UAE" },
+  { display: "Singapore", search: "Singapore" },
+  { display: "Sydney", search: "Sydney, Australia" },
+  { display: "Toronto", search: "Toronto, Canada" },
+  { display: "Berlin", search: "Berlin, Germany" },
+  { display: "Mumbai", search: "Mumbai, India" },
+  { display: "Bangkok", search: "Bangkok, Thailand" },
+  { display: "Istanbul", search: "Istanbul, Turkey" },
+  { display: "Seoul", search: "Seoul, South Korea" },
+  { display: "Hong Kong", search: "Hong Kong, China" },
+  { display: "Los Angeles", search: "Los Angeles, USA" },
+  { display: "Chicago", search: "Chicago, USA" },
+  { display: "Miami", search: "Miami, USA" },
+  { display: "Las Vegas", search: "Las Vegas, USA" },
+
+  // Additional major cities
+  { display: "Amsterdam", search: "Amsterdam, Netherlands" },
+  { display: "Rome", search: "Rome, Italy" },
+  { display: "Madrid", search: "Madrid, Spain" },
+  { display: "Vienna", search: "Vienna, Austria" },
+  { display: "Prague", search: "Prague, Czech Republic" },
+  { display: "Cairo", search: "Cairo, Egypt" },
+  { display: "Cape Town", search: "Cape Town, South Africa" },
+  { display: "Nairobi", search: "Nairobi, Kenya" },
+  { display: "Accra", search: "Accra, Ghana" },
+  { display: "Lagos", search: "Lagos, Nigeria" },
+  { display: "Abuja", search: "Abuja, Nigeria" },
+  { display: "Johannesburg", search: "Johannesburg, South Africa" },
+  { display: "Rio de Janeiro", search: "Rio de Janeiro, Brazil" },
+  { display: "São Paulo", search: "São Paulo, Brazil" },
+  { display: "Buenos Aires", search: "Buenos Aires, Argentina" },
+  { display: "Mexico City", search: "Mexico City, Mexico" },
+  { display: "Shanghai", search: "Shanghai, China" },
+  { display: "Beijing", search: "Beijing, China" },
+  { display: "Moscow", search: "Moscow, Russia" },
+];
+
+// Function to get random cities from pool (ensures no duplicates with existing cities)
+const getRandomCities = (existingCities = [], count = 10) => {
+  const existingCityNames = existingCities.map((city) =>
+    city.display.toLowerCase(),
+  );
+  const availableCities = randomCityPool.filter(
+    (city) => !existingCityNames.includes(city.display.toLowerCase()),
+  );
+
+  // Shuffle the available cities
+  const shuffled = [...availableCities].sort(() => 0.5 - Math.random());
+
+  // Return requested number of cities
+  return shuffled.slice(0, count);
+};
+
 export default function LocationFooter({ currentLocation = "" }) {
   const [popularCities, setPopularCities] = useState([]);
   const [currentCountry, setCurrentCountry] = useState("");
@@ -37,7 +97,7 @@ export default function LocationFooter({ currentLocation = "" }) {
       "Egypt",
       "Morocco",
     ],
-    []
+    [],
   );
 
   // Enhanced Nigerian locations with proper hierarchy
@@ -128,7 +188,7 @@ export default function LocationFooter({ currentLocation = "" }) {
       if (parts.length === 1) {
         const singlePart = parts[0].toLowerCase();
         const countryMatch = suggestedCountries.find(
-          (country) => country.toLowerCase() === singlePart
+          (country) => country.toLowerCase() === singlePart,
         );
 
         if (countryMatch) {
@@ -143,7 +203,7 @@ export default function LocationFooter({ currentLocation = "" }) {
         const secondLower = second.toLowerCase();
 
         const countryMatch = suggestedCountries.find((country) =>
-          country.toLowerCase().includes(secondLower)
+          country.toLowerCase().includes(secondLower),
         );
 
         if (countryMatch) {
@@ -162,7 +222,7 @@ export default function LocationFooter({ currentLocation = "" }) {
       if (parts.length >= 3) {
         const [city, state, countryPart] = parts;
         const countryMatch = suggestedCountries.find((country) =>
-          country.toLowerCase().includes(countryPart.toLowerCase())
+          country.toLowerCase().includes(countryPart.toLowerCase()),
         );
 
         return {
@@ -174,7 +234,7 @@ export default function LocationFooter({ currentLocation = "" }) {
 
       return { country: "", city: "", state: "" };
     },
-    [suggestedCountries]
+    [suggestedCountries],
   );
 
   // Check if we have good local data for this city
@@ -217,9 +277,9 @@ export default function LocationFooter({ currentLocation = "" }) {
         if (API_KEY) {
           const response = await fetch(
             `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(
-              city + (country ? `, ${country}` : "")
+              city + (country ? `, ${country}` : ""),
             )}&apiKey=${API_KEY}&limit=6&type=city`,
-            { signal: controller.signal }
+            { signal: controller.signal },
           );
 
           clearTimeout(timeoutId);
@@ -233,7 +293,7 @@ export default function LocationFooter({ currentLocation = "" }) {
                     place.properties.city &&
                     !place.properties.city
                       .toLowerCase()
-                      .includes(city.toLowerCase())
+                      .includes(city.toLowerCase()),
                 )
                 .map((place) => ({
                   display: place.properties.city,
@@ -249,9 +309,9 @@ export default function LocationFooter({ currentLocation = "" }) {
         // Fallback to OpenStreetMap if Geoapify fails or no key
         const fallbackResponse = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            `city near ${city}${country ? `, ${country}` : ""}`
+            `city near ${city}${country ? `, ${country}` : ""}`,
           )}&limit=6&featureType=city`,
-          { signal: controller.signal }
+          { signal: controller.signal },
         );
 
         clearTimeout(timeoutId);
@@ -291,7 +351,7 @@ export default function LocationFooter({ currentLocation = "" }) {
       apiCache.set(cacheKey, localData);
       return localData;
     },
-    [hasGoodLocalData]
+    [hasGoodLocalData],
   );
 
   // Enhanced local fallback data
@@ -519,6 +579,19 @@ export default function LocationFooter({ currentLocation = "" }) {
     }));
   }, []);
 
+  // NEW: Function to ensure we always have at least 20 cities
+  const ensureMinimumCities = useCallback((cities, currentCity = "") => {
+    // If we already have 20 or more cities, return as-is
+    if (cities.length >= 20) return cities;
+
+    // Get random cities to fill up to 20
+    const neededCities = 20 - cities.length;
+    const randomCities = getRandomCities(cities, neededCities);
+
+    // Combine existing cities with random ones
+    return [...cities, ...randomCities];
+  }, []);
+
   // Create URL with encoded spaces
   const createUrlWithSpaces = useCallback((cityData) => {
     const { search } = cityData;
@@ -532,7 +605,7 @@ export default function LocationFooter({ currentLocation = "" }) {
       const urlPath = createUrlWithSpaces(cityData);
       router.push(`/discover/${urlPath}`);
     },
-    [createUrlWithSpaces, router]
+    [createUrlWithSpaces, router],
   );
 
   // Country click handler
@@ -541,7 +614,7 @@ export default function LocationFooter({ currentLocation = "" }) {
       const urlPath = country.toLowerCase().replace(/\s+/g, " ");
       router.push(`/discover/${urlPath}`);
     },
-    [router]
+    [router],
   );
 
   // OPTIMIZED: Update cities with debouncing and immediate local data
@@ -561,7 +634,8 @@ export default function LocationFooter({ currentLocation = "" }) {
       if (city) {
         // Show local data IMMEDIATELY (fast)
         const immediateData = getLocalNearbyCities(city, country, state);
-        setPopularCities(immediateData.slice(0, 8));
+        const immediateDataWithFill = ensureMinimumCities(immediateData, city);
+        setPopularCities(immediateDataWithFill.slice(0, 20)); // Always show up to 20
 
         // Then try API in background (delayed)
         timeoutId = setTimeout(async () => {
@@ -569,15 +643,30 @@ export default function LocationFooter({ currentLocation = "" }) {
 
           setIsLoading(true);
           const apiData = await getNearbyCities(city, country);
-          if (isMounted && apiData.length > 0) {
-            setPopularCities(apiData.slice(0, 8));
+          if (isMounted) {
+            // Combine API data with immediate data, remove duplicates
+            const combined = [...apiData, ...immediateData];
+            const uniqueCities = combined.reduce((acc, current) => {
+              const x = acc.find((item) => item.display === current.display);
+              if (!x) {
+                return acc.concat([current]);
+              } else {
+                return acc;
+              }
+            }, []);
+
+            // Ensure we have at least 20 cities
+            const filledCities = ensureMinimumCities(uniqueCities, city);
+            setPopularCities(filledCities.slice(0, 20));
           }
           setIsLoading(false);
         }, 200); // Short delay for API call
       } else if (country) {
         const countryCities = getCitiesForCountry(country);
-        setPopularCities(countryCities.slice(0, 12));
+        const countryCitiesWithFill = ensureMinimumCities(countryCities);
+        setPopularCities(countryCitiesWithFill.slice(0, 20)); // Always show up to 20
       } else {
+        // For default view (countries), we don't need to fill to 20
         setPopularCities([]);
       }
     };
@@ -594,6 +683,7 @@ export default function LocationFooter({ currentLocation = "" }) {
     getLocalNearbyCities,
     getNearbyCities,
     getCitiesForCountry,
+    ensureMinimumCities,
   ]);
 
   // Preload common cities on component mount
@@ -619,7 +709,7 @@ export default function LocationFooter({ currentLocation = "" }) {
           currentCountry ? `, ${currentCountry}` : ""
         }`,
         subtitle: "Explore nearby locations",
-        cities: popularCities,
+        cities: popularCities.slice(0, 20), // Always limit to 20
         buttonText: `View all in ${currentCountry || "this region"}`,
         buttonClick: () => currentCountry && handleCountryClick(currentCountry),
       };
@@ -628,7 +718,7 @@ export default function LocationFooter({ currentLocation = "" }) {
         type: "country",
         title: `Popular Cities in ${currentCountry}`,
         subtitle: "Find independent escorts in these locations",
-        cities: popularCities,
+        cities: popularCities.slice(0, 20), // Always limit to 20
         buttonText: `View all cities in ${currentCountry}`,
         buttonClick: () => handleCountryClick(currentCountry),
       };
@@ -637,7 +727,7 @@ export default function LocationFooter({ currentLocation = "" }) {
         type: "default",
         title: "Popular Countries",
         subtitle: "Find independent escorts in these popular countries",
-        countries: suggestedCountries,
+        countries: suggestedCountries.slice(0, 20), // Show up to 20 countries
         buttonText: "Browse all locations",
         buttonClick: () => router.push("/discover"),
       };
@@ -647,7 +737,7 @@ export default function LocationFooter({ currentLocation = "" }) {
   const displayContent = getDisplayContent();
 
   return (
-    <div className="bg-black/50 border-t border-pink-500/20 mt-16">
+    <div className="bg-black/50 border-t border-pink-500/20 mt-16 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-6">
           <h3 className="text-xl font-bold text-white mb-2">
@@ -656,13 +746,13 @@ export default function LocationFooter({ currentLocation = "" }) {
           <p className="text-pink-200 text-sm">{displayContent.subtitle}</p>
         </div>
 
-        {/* Cities/Countries Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
+        {/* Cities/Countries Grid - Now always shows up to 20 items */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2">
           {(displayContent.type === "default"
             ? displayContent.countries
             : displayContent.cities
           )
-            .slice(0, 16)
+            .slice(0, 20) // Always show exactly 20 items when available
             .map((item, index) => (
               <button
                 key={index}
@@ -674,10 +764,13 @@ export default function LocationFooter({ currentLocation = "" }) {
                 className={`
                   ${
                     displayContent.type === "nearby"
-                      ? "bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30 hover:border-blue-500/50 text-blue-200"
+                      ? index <
+                        popularCities.length - getRandomCities([], 0).length // Real cities
+                        ? "bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30 hover:border-blue-500/50 text-blue-200"
+                        : "bg-gray-700/20 hover:bg-gray-700/30 border-gray-500/30 hover:border-gray-500/50 text-gray-300" // Random cities style
                       : displayContent.type === "country"
-                      ? "bg-pink-500/10 hover:bg-pink-500/20 border-pink-500/30 hover:border-pink-500/50 text-pink-200"
-                      : "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 hover:border-purple-500/50 text-purple-200"
+                        ? "bg-pink-500/10 hover:bg-pink-500/20 border-pink-500/30 hover:border-pink-500/50 text-pink-200"
+                        : "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 hover:border-purple-500/50 text-purple-200"
                   } 
                   hover:text-white border rounded-lg px-3 py-2 transition-all duration-300 hover:scale-105 text-xs text-center break-words min-h-[40px] flex items-center justify-center
                 `}
@@ -708,8 +801,8 @@ export default function LocationFooter({ currentLocation = "" }) {
                   displayContent.type === "nearby"
                     ? "text-blue-400 hover:text-blue-300"
                     : displayContent.type === "country"
-                    ? "text-pink-400 hover:text-pink-300"
-                    : "text-purple-400 hover:text-purple-300"
+                      ? "text-pink-400 hover:text-pink-300"
+                      : "text-purple-400 hover:text-purple-300"
                 } 
                 text-sm font-medium transition duration-300 hover:underline
               `}
@@ -718,6 +811,18 @@ export default function LocationFooter({ currentLocation = "" }) {
             </button>
           </div>
         )}
+
+        {/* Show count of real vs random cities for debugging (optional) */}
+        {process.env.NODE_ENV === "development" &&
+          displayContent.type === "nearby" && (
+            <div className="text-center mt-2">
+              <p className="text-gray-400 text-xs">
+                Showing {popularCities.length} locations (
+                {popularCities.length - getRandomCities([], 0).length} nearby,
+                {getRandomCities([], 0).length} popular cities)
+              </p>
+            </div>
+          )}
       </div>
     </div>
   );
